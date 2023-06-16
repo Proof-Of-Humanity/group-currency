@@ -247,6 +247,6 @@ contract PoHGroupCurrencyManager {
      *  @return Whether token is considered member of group.
      */
     function isMember(address _token) external view returns (bool) {
-        return hub.limits(address(gct), _token) > 100 && poh.isClaimed(tokenToProfile[_token]);
+        return hub.limits(address(gct), _token) > 0 && poh.isClaimed(tokenToProfile[_token]);
     }
 }
