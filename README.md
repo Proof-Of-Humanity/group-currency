@@ -46,13 +46,15 @@ If the PoH registered wallet also owns the personal token, a single transaction 
 
 ### **Minting group tokens**
 
-Once a personal currency has been added as member to the group it is possible to use it as collateral to mint Proof of Humanity Group Tokens ($HGT). The personal tokens are sent to the treasury and, in exchange, the person receives the same amount of group currency.
+Once a personal currency has been added as member to the group it is possible to use it as collateral to mint Proof of Humanity Group Tokens ($POH). The personal tokens are sent to the treasury and, in exchange, the person receives the same amount of group currency.
 
 >- Alice is registered in Proof of Humanity
 >- Bob has 10 AliceCoin
 >- Bob uses 10 AliceCoin to mint $POH
 >- Now Bob has 10 $POH
 >- The group currency treasury has 10 (more) AliceCoin
+
+The account minting must correspond to a member token and a claimed PoH ID.
 
 ### **Redeeming personal tokens**
 
@@ -66,3 +68,9 @@ The group tokens can further be used to redeem personal tokens from the treasury
 
 ### **Replacing the token**
 
+In order to replace a token, the owner must burn tokens in same amount as the total amount of group tokens she minted.
+
+>- Alice minted 10 $POH using 7 AliceCoin and 3 BobCoin
+>- Alice wants to replace her corresponding token (AliceCoin) to AliceCoinTwo
+>- Alice burns 10 $POH and sets her new token to the desired one
+>- Now it's possible to mint using AliceCoinTwo
