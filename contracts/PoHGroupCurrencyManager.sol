@@ -178,10 +178,10 @@ contract PoHGroupCurrencyManager {
         gct.removeMemberToken(profiles[poh.humanityOf(msg.sender)].token);
     }
 
-    /** @dev Deactivate profile corresponding to PoH ID.
+    /** @dev Deactivate profile not corresponding to PoH ID.
      *  @param _pohId PoH ID which, in case it is no longer claimed, to deactivate profile for.
      */
-    function deactivateNotPoHRegistered(bytes20 _pohId) external {
+    function deactivateNonPoHRegistered(bytes20 _pohId) external {
         require(!poh.isClaimed(_pohId), "poh id is claimed");
         gct.removeMemberToken(profiles[_pohId].token);
     }
@@ -204,19 +204,33 @@ contract PoHGroupCurrencyManager {
      *  @param _amount Amounts of corresponding tokens to mint.
      */
     function mint(address[] calldata _collateral, uint256[] calldata _amount) external {
+        address userToken = hub.userToToken(msg.sender);
+        bytes20 pohId = tokenToProfile[userToken];
+
+        // sender must correspond to profile registered on PoH
+        require(poh.isClaimed(pohId), "not registered on poh");
+
+        // check all collateral tokens for corresponding to claimed PoH ID
         uint256 nCollateral = _collateral.length;
-
         for (uint256 i; i < nCollateral; i++) {
-            bytes20 pohId = tokenToProfile[_collateral[i]];
+            address collateral = _collateral[i];
 
-            // token must correspond to claimed PoH ID
-            require(poh.isClaimed(pohId), "not member");
+            // if collateral is same as user's token, we already checked it
+            if (userToken == collateral) continue;
 
-            profiles[pohId].minted += _amount[i];
+            // if user uses collateral different from his token, check if that collateral corresponds to member token
+            // in case poh id expired, no longer consider the token as member
+            require(poh.isClaimed(tokenToProfile[collateral]), "not member");
+            // trust check is done in GCT contract when minting
         }
 
-        // send total amount minted to caller
+        // mint tokens for this contract
         uint256 totalMinted = gct.mint(_collateral, _amount);
+
+        // increment minted for profile
+        profiles[pohId].minted += totalMinted;
+
+        // transfer total amount minted to caller
         gct.transfer(msg.sender, totalMinted);
     }
 
@@ -227,26 +241,26 @@ contract PoHGroupCurrencyManager {
      *  @param _amount Amounts of corresponding collateral to be redeemed.
      */
     function redeem(address _redeemer, address[] calldata _collateral, uint256[] calldata _amount) external {
+        uint256 totalRedeemed;
         uint256 nCollateral = _collateral.length;
-        uint256 total;
         for (uint256 i; i < nCollateral; i++) {
             address collateral = _collateral[i];
             uint256 amount = _amount[i];
 
             IERC20(collateral).transfer(_redeemer, amount);
-            total += amount;
+            totalRedeemed += amount;
 
             emit Redeemed(_redeemer, collateral, amount);
         }
 
-        require(gct.transferFrom(msg.sender, address(0x0), total), "did not burn enough group tokens");
+        require(gct.transferFrom(msg.sender, address(0x0), totalRedeemed), "did not burn enough group tokens");
     }
 
-    /** @dev Indicates whether token is group member and corresponds to claimed PoH ID.
+    /** @dev Indicates whether token is group currency member and corresponds to a claimed PoH ID.
      *  @param _token Address of token to check if it's member.
      *  @return Whether token is considered member of group.
      */
-    function isMember(address _token) external view returns (bool) {
+    function isGroupMember(address _token) external view returns (bool) {
         return hub.limits(address(gct), _token) > 0 && poh.isClaimed(tokenToProfile[_token]);
     }
 }
