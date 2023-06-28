@@ -197,9 +197,6 @@ contract PoHGroupCurrencyManager {
 
         Profile storage profile = profiles[pohId];
 
-        // simple check to avoid user/ui mistake
-        require(_newToken != profile.token, "must have new token");
-
         // user must burn same amount of group currency as totally minted
         require(
             gct.transferFrom(msg.sender, address(0x0), profile.minted),
