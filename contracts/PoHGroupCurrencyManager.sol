@@ -3,7 +3,11 @@ pragma solidity 0.8.18;
 
 import {IERC20, IProofOfHumanity, IHub, IGCT} from "./interfaces.sol";
 
-// @title PoHGroupCurrencyManager
+/** @title PoHGroupCurrencyManager
+ *  - Is owner of GCT
+ *  - GCT has owner-only minting
+ *  - Organization in hub
+ */
 contract PoHGroupCurrencyManager {
     event GovernorChanged(address newGovernor);
     event PoHChanged(address newPoH);
