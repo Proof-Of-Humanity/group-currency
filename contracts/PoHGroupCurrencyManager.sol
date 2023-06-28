@@ -83,6 +83,12 @@ contract PoHGroupCurrencyManager {
         poh = IProofOfHumanity(_poh);
     }
 
+    function changeRedeemFeePerThousand(
+        uint8 _redeemFeePerThousand
+    ) external onlyGovernor {
+        redeemFeePerThousand = _redeemFeePerThousand;
+    }
+
     // ========== FUNCTIONS ==========
 
     /** @dev Create profile corresponding to pohId of caller.
