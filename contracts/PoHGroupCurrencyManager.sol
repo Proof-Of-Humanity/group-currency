@@ -245,18 +245,11 @@ contract PoHGroupCurrencyManager {
         uint256[] calldata _amount
     ) external {
         address userToken = hub.userToToken(msg.sender);
-        bytes20 pohId = tokenToProfile[userToken];
-
-        // sender must correspond to profile registered on PoH
-        require(poh.isClaimed(pohId), "not registered on poh");
 
         // check all collateral tokens for corresponding to claimed PoH ID
         uint256 nCollateral = _collateral.length;
         for (uint256 i; i < nCollateral; i++) {
             address collateral = _collateral[i];
-
-            // if collateral is same as user's token, we already checked it
-            if (userToken == collateral) continue;
 
             // if user uses collateral different from his token, check if that collateral corresponds to member token
             // in case poh id expired, no longer consider the token as member
@@ -268,7 +261,7 @@ contract PoHGroupCurrencyManager {
         uint256 totalMinted = gct.mint(_collateral, _amount);
 
         // increment minted for profile
-        profiles[pohId].minted += totalMinted;
+        profiles[tokenToProfile[userToken]].minted += totalMinted;
 
         // transfer total amount minted to caller
         gct.transfer(msg.sender, totalMinted);
