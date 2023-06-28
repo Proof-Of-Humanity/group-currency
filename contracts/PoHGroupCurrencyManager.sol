@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {IERC20,IProofOfHumanity,IHub,IGCT} from "./interfaces.sol";
+import {IERC20, IProofOfHumanity, IHub, IGCT} from "./interfaces.sol";
 
 // @title PoHGroupCurrencyManager
 contract PoHGroupCurrencyManager {
@@ -10,7 +10,11 @@ contract PoHGroupCurrencyManager {
     event ProfileReset(bytes20 indexed pohId, address indexed newToken);
     event Deactivated(bytes20 indexed pohId);
     event Reactivated(bytes20 indexed pohId);
-    event Redeemed(address indexed redeemer, address indexed collateral, uint256 amount);
+    event Redeemed(
+        address indexed redeemer,
+        address indexed collateral,
+        uint256 amount
+    );
 
     // ========== STRUCTS ===========
 
@@ -50,6 +54,8 @@ contract PoHGroupCurrencyManager {
         poh = IProofOfHumanity(_poh);
         gct = IGCT(_gct);
         hub = IHub(_hub);
+
+        hub.organizationSignup();
     }
 
     // ========== GOVERNANCE ==========
@@ -76,9 +82,15 @@ contract PoHGroupCurrencyManager {
      *  @param _token The token to be used for the profile.
      */
     function createProfile(address _token) external {
-        require(hub.tokenToUser(_token) != address(0x0), "token not hub member");
+        require(
+            hub.tokenToUser(_token) != address(0x0),
+            "token not hub member"
+        );
         // token used must not correspond to another profile
-        require(tokenToProfile[_token] == bytes20(0x0), "token corresponds to a profile");
+        require(
+            tokenToProfile[_token] == bytes20(0x0),
+            "token corresponds to a profile"
+        );
 
         bytes20 pohId = poh.humanityOf(msg.sender);
         require(pohId != bytes20(0x0), "not registered on poh");
@@ -102,7 +114,10 @@ contract PoHGroupCurrencyManager {
         require(token != address(0x0), "user token not hub member");
 
         Profile storage profile = profiles[_pohId];
-        require(profile.token == token, "profile token does not match to user token");
+        require(
+            profile.token == token,
+            "profile token does not match to user token"
+        );
 
         // check in case this function is called after resetMinted
         require(profile.minted == 0, "already started minting");
@@ -119,7 +134,10 @@ contract PoHGroupCurrencyManager {
     function directRegister() external {
         address token = hub.userToToken(msg.sender);
         require(token != address(0x0), "token not hub member");
-        require(tokenToProfile[token] == bytes20(0x0), "token corresponds to a profile");
+        require(
+            tokenToProfile[token] == bytes20(0x0),
+            "token corresponds to a profile"
+        );
 
         bytes20 pohId = poh.humanityOf(msg.sender);
         require(pohId != bytes20(0x0), "not registered on poh");
@@ -142,9 +160,15 @@ contract PoHGroupCurrencyManager {
      *  @param _newToken Address of the token to replace the current one.
      */
     function resetProfile(address _newToken) external {
-        require(hub.tokenToUser(_newToken) != address(0x0), "token not hub member");
+        require(
+            hub.tokenToUser(_newToken) != address(0x0),
+            "token not hub member"
+        );
         // new token used must not correspond to another profile
-        require(tokenToProfile[_newToken] == bytes20(0x0), "token corresponds to a profile");
+        require(
+            tokenToProfile[_newToken] == bytes20(0x0),
+            "token corresponds to a profile"
+        );
 
         bytes20 pohId = poh.humanityOf(msg.sender);
         require(pohId != bytes20(0x0), "sender not registered on poh");
@@ -155,7 +179,10 @@ contract PoHGroupCurrencyManager {
         require(_newToken != profile.token, "must have new token");
 
         // user must burn same amount of group currency as totally minted
-        require(gct.transferFrom(msg.sender, address(0x0), profile.minted), "must burn enough group tokens");
+        require(
+            gct.transferFrom(msg.sender, address(0x0), profile.minted),
+            "must burn enough group tokens"
+        );
 
         // remove corresponding profile for old token
         delete tokenToProfile[profile.token];
@@ -203,7 +230,10 @@ contract PoHGroupCurrencyManager {
      *  @param _collateral Addresses of token to be used as collateral.
      *  @param _amount Amounts of corresponding tokens to mint.
      */
-    function mint(address[] calldata _collateral, uint256[] calldata _amount) external {
+    function mint(
+        address[] calldata _collateral,
+        uint256[] calldata _amount
+    ) external {
         address userToken = hub.userToToken(msg.sender);
         bytes20 pohId = tokenToProfile[userToken];
 
@@ -240,7 +270,11 @@ contract PoHGroupCurrencyManager {
      *  @param _collateral Addresses of collateral to be redeemed.
      *  @param _amount Amounts of corresponding collateral to be redeemed.
      */
-    function redeem(address _redeemer, address[] calldata _collateral, uint256[] calldata _amount) external {
+    function redeem(
+        address _redeemer,
+        address[] calldata _collateral,
+        uint256[] calldata _amount
+    ) external {
         uint256 totalRedeemed;
         uint256 nCollateral = _collateral.length;
         for (uint256 i; i < nCollateral; i++) {
@@ -253,7 +287,10 @@ contract PoHGroupCurrencyManager {
             emit Redeemed(_redeemer, collateral, amount);
         }
 
-        require(gct.transferFrom(msg.sender, address(0x0), totalRedeemed), "did not burn enough group tokens");
+        require(
+            gct.transferFrom(msg.sender, address(0x0), totalRedeemed),
+            "did not burn enough group tokens"
+        );
     }
 
     /** @dev Indicates whether token is group currency member and corresponds to a claimed PoH ID.
@@ -261,6 +298,8 @@ contract PoHGroupCurrencyManager {
      *  @return Whether token is considered member of group.
      */
     function isGroupMember(address _token) external view returns (bool) {
-        return hub.limits(address(gct), _token) > 0 && poh.isClaimed(tokenToProfile[_token]);
+        return
+            hub.limits(address(gct), _token) > 0 &&
+            poh.isClaimed(tokenToProfile[_token]);
     }
 }

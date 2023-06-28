@@ -28,6 +28,8 @@ interface IHub {
 
     function tokenToUser(address) external returns (address);
 
+    function organizationSignup() external;
+
     function trust(address, uint256) external;
 
     function limits(address, address) external view returns (uint256);
