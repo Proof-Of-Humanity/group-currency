@@ -25,6 +25,9 @@ contract PoHGroupCurrencyManager {
 
     // ========== STORAGE ===========
 
+    // @dev Fee applied when redeeming collateral for group currency
+    uint8 public redeemFeePerThousand;
+
     // @dev Contract able to execute governance functions
     address public governor;
 
@@ -49,11 +52,18 @@ contract PoHGroupCurrencyManager {
 
     // ========== CONSTRUCTOR ==========
 
-    function initialize(address _poh, address _gct, address _hub) public {
+    function initialize(
+        address _poh,
+        address _gct,
+        address _hub,
+        uint8 _redeemFeePerThousand
+    ) public {
         governor = msg.sender;
         poh = IProofOfHumanity(_poh);
         gct = IGCT(_gct);
         hub = IHub(_hub);
+
+        redeemFeePerThousand = _redeemFeePerThousand;
 
         hub.organizationSignup();
     }
@@ -275,22 +285,33 @@ contract PoHGroupCurrencyManager {
         address[] calldata _collateral,
         uint256[] calldata _amount
     ) external {
-        uint256 totalRedeemed;
         uint256 nCollateral = _collateral.length;
+
+        // calculate total of coins to redeem before applying the fee
+        uint256 totalToRedeem;
+        for (uint256 i; i < nCollateral; i++) {
+            totalToRedeem += _amount[i];
+        }
+
+        uint256 redeemFee = (totalToRedeem * redeemFeePerThousand) / 1000;
+        require(
+            gct.transferFrom(
+                msg.sender,
+                address(0x0),
+                totalToRedeem + redeemFee
+            ),
+            "did not burn enough group tokens"
+        );
+
+        // transfer the specified collateral to the redeemer
         for (uint256 i; i < nCollateral; i++) {
             address collateral = _collateral[i];
             uint256 amount = _amount[i];
 
             IERC20(collateral).transfer(_redeemer, amount);
-            totalRedeemed += amount;
 
             emit Redeemed(_redeemer, collateral, amount);
         }
-
-        require(
-            gct.transferFrom(msg.sender, address(0x0), totalRedeemed),
-            "did not burn enough group tokens"
-        );
     }
 
     /** @dev Indicates whether token is group currency member and corresponds to a claimed PoH ID.
