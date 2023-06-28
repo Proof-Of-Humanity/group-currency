@@ -95,6 +95,15 @@ contract PoHGroupCurrencyManager {
         emit RedeemFeeChanged(_redeemFeePerThousand);
     }
 
+    function executeGovernorTx(
+        address _destination,
+        uint _amount,
+        bytes calldata _data
+    ) external onlyGovernor {
+        (bool success, ) = _destination.call{value: _amount}(_data);
+        require(success, "governor transaction failed");
+    }
+
     // ========== FUNCTIONS ==========
 
     /** @dev Create profile corresponding to pohId of caller.
