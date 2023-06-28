@@ -5,11 +5,10 @@ import {IERC20, IProofOfHumanity, IHub, IGCT} from "./interfaces.sol";
 
 // @title PoHGroupCurrencyManager
 contract PoHGroupCurrencyManager {
-    event ProfileCreated(bytes20 indexed pohId, address indexed token);
-    event TokenRegistered(bytes20 indexed pohId, address indexed token);
-    event ProfileReset(bytes20 indexed pohId, address indexed newToken);
-    event Deactivated(bytes20 indexed pohId);
-    event Reactivated(bytes20 indexed pohId);
+    event GovernorChanged(address newGovernor);
+    event PoHChanged(address newPoH);
+    event RedeemFeeChanged(uint8 newRedeemFeePerThousand);
+    event ProfileUpdate(bytes20 indexed pohId, address indexed token);
     event Redeemed(
         address indexed redeemer,
         address indexed collateral,
@@ -77,16 +76,19 @@ contract PoHGroupCurrencyManager {
 
     function changeGovernor(address _newGovernor) external onlyGovernor {
         governor = _newGovernor;
+        emit GovernorChanged(governor);
     }
 
     function changePoH(address _poh) external onlyGovernor {
         poh = IProofOfHumanity(_poh);
+        emit PoHChanged(_poh);
     }
 
     function changeRedeemFeePerThousand(
         uint8 _redeemFeePerThousand
     ) external onlyGovernor {
         redeemFeePerThousand = _redeemFeePerThousand;
+        emit RedeemFeeChanged(_redeemFeePerThousand);
     }
 
     // ========== FUNCTIONS ==========
@@ -118,7 +120,7 @@ contract PoHGroupCurrencyManager {
         // set token for profile so it can be confirmed when user token calls `registerToken`
         profile.token = _token;
 
-        emit ProfileCreated(pohId, _token);
+        emit ProfileUpdate(pohId, _token);
     }
 
     /** @dev Register token after creating profile or after the minting was reset in order to replace token.
@@ -167,7 +169,7 @@ contract PoHGroupCurrencyManager {
 
         gct.addMemberToken(token);
 
-        emit ProfileCreated(pohId, token);
+        emit ProfileUpdate(pohId, token);
     }
 
     /** @dev Reset the number of minted tokens in order to replace token before calling `registerToken` again.
@@ -212,7 +214,7 @@ contract PoHGroupCurrencyManager {
         // reset minted
         profile.minted = 0;
 
-        emit ProfileReset(pohId, _newToken);
+        emit ProfileUpdate(pohId, _newToken);
     }
 
     /** @dev Deactivate profile corresponding to PoH ID of caller.
