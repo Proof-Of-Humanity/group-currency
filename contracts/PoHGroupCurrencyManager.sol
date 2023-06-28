@@ -275,7 +275,7 @@ contract PoHGroupCurrencyManager {
     }
 
     /** @dev Redeem collateral previously used to mint group tokens.
-     *  @dev Must burn equal amount of group tokens as collateral asked.
+     *  @dev Must burn equal amount of group tokens (not considering the fee) as collateral asked.
      *  @param _redeemer Address to which to send redeemed collateral.
      *  @param _collateral Addresses of collateral to be redeemed.
      *  @param _amount Amounts of corresponding collateral to be redeemed.
