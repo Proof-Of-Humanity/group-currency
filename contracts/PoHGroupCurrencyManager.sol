@@ -331,7 +331,7 @@ contract PoHGroupCurrencyManager {
      */
     function isGroupMember(address _token) external view returns (bool) {
         return
-            hub.limits(address(gct), _token) > 0 &&
+            hub.limits(address(gct), hub.tokenToUser(_token)) > 0 &&
             poh.isClaimed(tokenToProfile[_token]);
     }
 }
