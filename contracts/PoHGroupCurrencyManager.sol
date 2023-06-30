@@ -262,7 +262,11 @@ contract PoHGroupCurrencyManager {
         address[] calldata _collateral,
         uint256[] calldata _amount
     ) external {
+        require(hub.limits(address(gct), msg.sender) > 0, "user not trusted");
+
         address userToken = hub.userToToken(msg.sender);
+        bytes20 pohId = tokenToProfile[userToken];
+        require(poh.isClaimed(pohId), "user not registered on PoH");
 
         // check all collateral tokens for corresponding to claimed PoH ID
         uint256 nCollateral = _collateral.length;
