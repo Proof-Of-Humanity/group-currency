@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import {IERC20, IProofOfHumanity, IHub, IGCT} from "./interfaces.sol";
+import {IERC20, IProofOfHumanity, IHub, IGCT, IGroupMembershipDiscriminator} from "./interfaces.sol";
 
 /** @title PoHGroupCurrencyManager
  *  - Is owner of GCT
  *  - GCT has owner-only minting
  *  - Organization in hub
  */
-contract PoHGroupCurrencyManager {
+contract PoHGroupCurrencyManager is IGroupMembershipDiscriminator {
     event GovernorChanged(address newGovernor);
     event PoHChanged(address newPoH);
     event RedeemFeeChanged(uint8 newRedeemFeePerThousand);
-    event ProfileUpdate(bytes20 indexed pohId, address indexed token);
+    event ProfileUpdate(bytes20 indexed pohId, address indexed user);
     event Redeemed(
         address indexed redeemer,
         address indexed collateral,
@@ -22,7 +22,7 @@ contract PoHGroupCurrencyManager {
     // ========== STRUCTS ===========
 
     struct Profile {
-        address token; // corresponding token for the profile
+        address user; // corresponding user of token for the profile
         uint256 minted; // counter of total minted group tokens; can be reset in case of having to replace token
     }
 
@@ -51,7 +51,7 @@ contract PoHGroupCurrencyManager {
 
     // @dev Mapping of tokens to pohIds corresponding to the profiles
     // @dev Should only be non-null when token has never been set for a profile or after
-    mapping(address => bytes20) public tokenToProfile;
+    mapping(address => bytes20) public userToProfile;
 
     // ========== CONSTRUCTOR ==========
 
@@ -107,20 +107,18 @@ contract PoHGroupCurrencyManager {
     // ========== FUNCTIONS ==========
 
     /** @dev Create profile corresponding to pohId of caller.
-     *  @dev The user of the token will need to call `registerToken` in order to make the token a member.
+     *  @dev The user of the token will need to call `registerToken` in order to become member.
      *  @notice Must be called from wallet registered on PoH.
      *  @notice Alternatively see `directRegister()`.
      *  @param _token The token to be used for the profile.
      */
     function createProfile(address _token) external {
+        address tokenUser = hub.tokenToUser(_token);
+        require(tokenUser != address(0x0), "token not hub member");
+        // user used must not correspond to another profile
         require(
-            hub.tokenToUser(_token) != address(0x0),
-            "token not hub member"
-        );
-        // token used must not correspond to another profile
-        require(
-            tokenToProfile[_token] == bytes20(0x0),
-            "token corresponds to a profile"
+            userToProfile[tokenUser] == bytes20(0x0),
+            "user corresponds to a profile"
         );
 
         bytes20 pohId = poh.humanityOf(msg.sender);
@@ -128,15 +126,15 @@ contract PoHGroupCurrencyManager {
 
         Profile storage profile = profiles[pohId];
         // token should only be null when profile has not been yet created
-        require(profile.token == address(0x0), "profile already created");
+        require(profile.user == address(0x0), "profile already created");
 
         // set token for profile so it can be confirmed when user token calls `registerToken`
-        profile.token = _token;
+        profile.user = tokenUser;
 
-        emit ProfileUpdate(pohId, _token);
+        emit ProfileUpdate(pohId, tokenUser);
     }
 
-    /** @dev Register token after creating profile or after the minting was reset in order to replace token.
+    /** @dev Register user after creating profile or after the minting was reset in order to replace user of token for profile.
      *  @notice Must be called from wallet having a token in the hub.
      *  @param _pohId The pohId corresponding to the profile the token should be added for.
      */
@@ -146,27 +144,29 @@ contract PoHGroupCurrencyManager {
 
         Profile storage profile = profiles[_pohId];
         require(
-            profile.token == token,
-            "profile token does not match to user token"
+            profile.user == msg.sender,
+            "profile user does not match to user token"
         );
 
         // check in case this function is called after resetMinted
         require(profile.minted == 0, "already started minting");
 
-        tokenToProfile[token] = _pohId;
+        userToProfile[msg.sender] = _pohId;
 
-        gct.addMemberToken(token);
+        gct.addMember(msg.sender);
     }
 
-    /** @dev Create profile and register token for pohId in one function call in case PoH wallet and token wallet are the same.
-     *  @dev The token used must not correspond to another profile.
+    /** @dev Create profile and register user for pohId in one function call in case PoH wallet and token wallet are the same.
+     *  @dev The token user used must not correspond to another profile.
      *  @notice Must be called from wallet both registered on PoH and having a token in the hub.
      */
     function directRegister() external {
-        address token = hub.userToToken(msg.sender);
-        require(token != address(0x0), "token not hub member");
         require(
-            tokenToProfile[token] == bytes20(0x0),
+            hub.userToToken(msg.sender) != address(0x0),
+            "token not hub member"
+        );
+        require(
+            userToProfile[msg.sender] == bytes20(0x0),
             "token corresponds to a profile"
         );
 
@@ -175,14 +175,14 @@ contract PoHGroupCurrencyManager {
 
         Profile storage profile = profiles[pohId];
         // token should only be null when profile has not been yet created
-        require(profile.token == address(0x0), "profile already created");
+        require(profile.user == address(0x0), "profile already created");
 
-        profile.token = token;
-        tokenToProfile[token] = pohId;
+        profile.user = msg.sender;
+        userToProfile[msg.sender] = pohId;
 
-        gct.addMemberToken(token);
+        gct.addMember(msg.sender);
 
-        emit ProfileUpdate(pohId, token);
+        emit ProfileUpdate(pohId, msg.sender);
     }
 
     /** @dev Reset the number of minted tokens in order to replace token before calling `registerToken` again.
@@ -191,13 +191,14 @@ contract PoHGroupCurrencyManager {
      *  @param _newToken Address of the token to replace the current one.
      */
     function resetProfile(address _newToken) external {
+        address tokenUser = hub.tokenToUser(_newToken);
         require(
-            hub.tokenToUser(_newToken) != address(0x0),
+            hub.tokenToUser(tokenUser) != address(0x0),
             "token not hub member"
         );
-        // new token used must not correspond to another profile
+        // new token user used must not correspond to another profile
         require(
-            tokenToProfile[_newToken] == bytes20(0x0),
+            userToProfile[tokenUser] == bytes20(0x0),
             "token corresponds to a profile"
         );
 
@@ -213,24 +214,24 @@ contract PoHGroupCurrencyManager {
         );
 
         // remove corresponding profile for old token
-        delete tokenToProfile[profile.token];
+        delete userToProfile[profile.user];
 
         // remove as group member
-        gct.removeMemberToken(profile.token);
+        gct.removeMember(profile.user);
 
-        // update token to new one
-        profile.token = _newToken;
+        // update user to new one
+        profile.user = tokenUser;
 
         // reset minted
         profile.minted = 0;
 
-        emit ProfileUpdate(pohId, _newToken);
+        emit ProfileUpdate(pohId, tokenUser);
     }
 
     /** @dev Deactivate profile corresponding to PoH ID of caller.
      */
     function deactivate() external {
-        gct.removeMemberToken(profiles[poh.humanityOf(msg.sender)].token);
+        gct.removeMember(profiles[poh.humanityOf(msg.sender)].user);
     }
 
     /** @dev Deactivate profile not corresponding to PoH ID.
@@ -238,19 +239,16 @@ contract PoHGroupCurrencyManager {
      */
     function deactivateNonPoHRegistered(bytes20 _pohId) external {
         require(!poh.isClaimed(_pohId), "poh id is claimed");
-        gct.removeMemberToken(profiles[_pohId].token);
+        gct.removeMember(profiles[_pohId].user);
     }
 
     /** @dev Reactivate profile corresponding to PoH ID of caller after a previous deactivation.
      */
     function reactivate() external {
-        bytes20 pohId = poh.humanityOf(msg.sender);
-        Profile storage profile = profiles[pohId];
-
         // will revert in case of null pohId
-        require(tokenToProfile[profile.token] != bytes20(0x0), "not member");
+        require(userToProfile[msg.sender] != bytes20(0x0), "not member");
 
-        gct.addMemberToken(profile.token);
+        gct.addMember(msg.sender);
     }
 
     /** @dev Mint group tokens in amount specified backed 1-on-1 by specified collateral.
@@ -264,9 +262,8 @@ contract PoHGroupCurrencyManager {
     ) external {
         require(hub.limits(address(gct), msg.sender) > 0, "user not trusted");
 
-        address userToken = hub.userToToken(msg.sender);
-        bytes20 pohId = tokenToProfile[userToken];
-        require(poh.isClaimed(pohId), "user not registered on PoH");
+        bytes20 pohId = userToProfile[msg.sender];
+        require(poh.isClaimed(pohId), "profile not registered on PoH");
 
         // check all collateral tokens for corresponding to claimed PoH ID
         uint256 nCollateral = _collateral.length;
@@ -275,7 +272,10 @@ contract PoHGroupCurrencyManager {
 
             // if user uses collateral different from his token, check if that collateral corresponds to member token
             // in case poh id expired, no longer consider the token as member
-            require(poh.isClaimed(tokenToProfile[collateral]), "not member");
+            require(
+                poh.isClaimed(userToProfile[hub.tokenToUser(collateral)]),
+                "not member"
+            );
             // trust check is done in GCT contract when minting
         }
 
@@ -283,7 +283,7 @@ contract PoHGroupCurrencyManager {
         uint256 totalMinted = gct.mint(_collateral, _amount);
 
         // increment minted for profile
-        profiles[tokenToProfile[userToken]].minted += totalMinted;
+        profiles[pohId].minted += totalMinted;
 
         // transfer total amount minted to caller
         gct.transfer(msg.sender, totalMinted);
@@ -329,13 +329,24 @@ contract PoHGroupCurrencyManager {
         }
     }
 
-    /** @dev Indicates whether token is group currency member and corresponds to a claimed PoH ID.
-     *  @param _token Address of token to check if it's member.
-     *  @return Whether token is considered member of group.
+    // ========== DISCRIMINATOR ==========
+
+    /** @dev Indicates whether user has profile and corresponds to a claimed PoH ID.
+     *  @notice This is used for discriminator and does not check hub limits between gct and user.
+     *  @param _user Address of user to check if it's member.
+     *  @return Whether user is considered member of group.
      */
-    function isGroupMember(address _token) external view returns (bool) {
-        return
-            hub.limits(address(gct), hub.tokenToUser(_token)) > 0 &&
-            poh.isClaimed(tokenToProfile[_token]);
+    function isMember(address _user) external view returns (bool) {
+        return poh.isClaimed(userToProfile[_user]);
+    }
+
+    /** @dev Returns corresponding error messages when user does not have profile, or profile is not registered on poh.
+     *  @notice This is used for discriminator and does not check hub limits between gct and user.
+     *  @param _user Address of user to check if it's member.
+     */
+    function requireIsMember(address _user) external view {
+        bytes20 pohId = userToProfile[_user];
+        require(pohId != bytes20(0x0), "user does not correspond to a profile");
+        require(poh.isClaimed(pohId), "profile not registered on PoH");
     }
 }

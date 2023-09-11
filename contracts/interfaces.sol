@@ -46,12 +46,18 @@ interface IHub {
 }
 
 interface IGCT is IERC20 {
-    function addMemberToken(address _member) external;
+    function addMember(address _user) external;
 
-    function removeMemberToken(address _member) external;
+    function removeMember(address _user) external;
 
     function mint(
         address[] calldata _collateral,
         uint256[] calldata _amount
     ) external returns (uint256);
+}
+
+interface IGroupMembershipDiscriminator {
+    function requireIsMember(address _user) external view;
+
+    function isMember(address _user) external view returns (bool);
 }
