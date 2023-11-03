@@ -251,44 +251,6 @@ contract PoHGroupCurrencyManager is IGroupMembershipDiscriminator {
         gct.addMember(msg.sender);
     }
 
-    /** @dev Mint group tokens in amount specified backed 1-on-1 by specified collateral.
-     *  @dev Must allow to send specified amount of collateral to this contract.
-     *  @param _collateral Addresses of token to be used as collateral.
-     *  @param _amount Amounts of corresponding tokens to mint.
-     */
-    function mint(
-        address[] calldata _collateral,
-        uint256[] calldata _amount
-    ) external {
-        require(hub.limits(address(gct), msg.sender) > 0, "user not trusted");
-
-        bytes20 pohId = userToProfile[msg.sender];
-        require(poh.isClaimed(pohId), "profile not registered on PoH");
-
-        // check all collateral tokens for corresponding to claimed PoH ID
-        uint256 nCollateral = _collateral.length;
-        for (uint256 i; i < nCollateral; i++) {
-            address collateral = _collateral[i];
-
-            // if user uses collateral different from his token, check if that collateral corresponds to member token
-            // in case poh id expired, no longer consider the token as member
-            require(
-                poh.isClaimed(userToProfile[hub.tokenToUser(collateral)]),
-                "not member"
-            );
-            // trust check is done in GCT contract when minting
-        }
-
-        // mint tokens for this contract
-        uint256 totalMinted = gct.mint(_collateral, _amount);
-
-        // increment minted for profile
-        profiles[pohId].minted += totalMinted;
-
-        // transfer total amount minted to caller
-        gct.transfer(msg.sender, totalMinted);
-    }
-
     /** @dev Redeem collateral previously used to mint group tokens.
      *  @dev Must burn equal amount of group tokens (not considering the fee) as collateral asked.
      *  @param _redeemer Address to which to send redeemed collateral.
